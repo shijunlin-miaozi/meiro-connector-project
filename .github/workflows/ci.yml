@@ -3,6 +3,7 @@ name: CI
 on:
   push:
   pull_request:
+  workflow_dispatch:
 
 jobs:
   # Runs fast, deterministic unit tests (integration excluded via pytest.ini testpaths).
@@ -68,12 +69,18 @@ jobs:
           SRC_TAB: ${{ secrets.SHEET_TAB }}
           DST_TAB: ${{ secrets.UPLOAD_SHEET_TAB }}
         run: |
-          echo "$SA_JSON" > "$GITHUB_WORKSPACE/credentials.json"
-          echo "GOOGLE_APPLICATION_CREDENTIALS=$GITHUB_WORKSPACE/credentials.json" >> $GITHUB_ENV
-          [ -n "$SRC" ] && echo "SHEET_URL_OR_ID=$SRC" >> $GITHUB_ENV
-          [ -n "$SRC_TAB" ] && echo "SHEET_TAB=$SRC_TAB" >> $GITHUB_ENV
-          [ -n "$DST" ] && echo "UPLOAD_SHEET_URL_OR_ID=$DST" >> $GITHUB_ENV
-          [ -n "$DST_TAB" ] && echo "UPLOAD_SHEET_TAB=$DST_TAB" >> $GITHUB_ENV
+          set -e
+          # Write the service account JSON exactly as provided
+          printf '%s' "$SA_JSON" > "$GITHUB_WORKSPACE/credentials.json"
+
+          # Append environment variables safely (guard empties)
+          {
+            echo "GOOGLE_APPLICATION_CREDENTIALS=$GITHUB_WORKSPACE/credentials.json"
+            if [ -n "${SRC:-}" ]; then echo "SHEET_URL_OR_ID=$SRC"; fi
+            if [ -n "${SRC_TAB:-}" ]; then echo "SHEET_TAB=$SRC_TAB"; fi
+            if [ -n "${DST:-}" ]; then echo "UPLOAD_SHEET_URL_OR_ID=$DST"; fi
+            if [ -n "${DST_TAB:-}" ]; then echo "UPLOAD_SHEET_TAB=$DST_TAB"; fi
+          } >> "$GITHUB_ENV"
 
       - name: Run Google Sheets integration tests (read + write)
         if: steps.gate.outputs.run == 'true'
