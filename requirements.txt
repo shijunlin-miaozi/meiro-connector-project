@@ -1,0 +1,24 @@
+# Core web stack
+fastapi==0.112.0
+uvicorn==0.30.5
+
+# HTTP clients (app + tests)
+requests==2.32.3
+httpx==0.27.2
+
+# Google Sheets stack
+gspread==6.0.2
+google-auth==2.29.0
+
+# Config & retries
+python-dotenv==1.0.1
+tenacity==8.2.2
+
+# Data validation & parsing
+email-validator==2.2.0
+python-dateutil==2.9.0.post0
+pydantic==2.8.2
+
+# Testing
+pytest==8.3.2
+pytest-mock==3.14.0

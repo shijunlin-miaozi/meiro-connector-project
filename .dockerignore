@@ -1,0 +1,34 @@
+# VCS & OS junk
+.git
+.github/
+**/.DS_Store
+**/__MACOSX/
+
+# Python bytecode & caches
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.cache/
+.mypy_cache/
+.ruff_cache/
+
+# Coverage reports
+.coverage
+.coverage.*
+htmlcov/
+
+# Local env & secrets (mount at runtime instead)
+.env
+.env.local
+secrets/
+*.service-account.json
+*service_account*.json
+*credentials*.json
+
+# Logs
+*.log
+
+# Build artifacts
+out/

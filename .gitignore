@@ -1,0 +1,36 @@
+# OS / VCS
+**/.DS_Store
+**/__MACOSX/
+.git/
+
+# Python bytecode & caches
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.cache/
+.mypy_cache/
+.ruff_cache/
+
+# Coverage
+.coverage
+.coverage.*
+htmlcov/
+
+# Env & secrets (keep only the example)
+.env
+.env.local
+.env.*.local
+!.env.example
+secrets/
+credentials.json
+*.service-account.json
+*service_account*.json
+*credentials*.json
+
+# Logs
+*.log
+
+# Build/output
+out/

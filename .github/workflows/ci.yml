@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  # Runs fast, deterministic unit tests (integration excluded via pytest.ini testpaths).
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install deps
+        run: pip install -r requirements.txt
+      - name: Run unit tests
+        run: pytest -q
+
+  # Exercises FastAPI ingestion (/ingest) using TestClient (no secrets).
+  integration-http:
+    needs: unit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install deps
+        run: pip install -r requirements.txt
+      - name: Run HTTP ingestion integration test
+        run: pytest -q tests/integration/test_http_upload.py
+
+  # Reads and writes Google Sheets when service-account JSON and sheet IDs are provided.
+  integration-sheets:
+    if: ${{ secrets.GCP_SA_JSON != '' && (secrets.SHEET_URL_OR_ID != '' || secrets.UPLOAD_SHEET_URL_OR_ID != '') }}
+    needs: unit
+    runs-on: ubuntu-latest
+    env:
+      RUN_SHEETS_INTEGRATION: "1"
+      RUN_SHEETS_WRITE: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install deps
+        run: pip install -r requirements.txt
+      - name: Materialize Google credentials + test env
+        run: |
+          echo "${{ secrets.GCP_SA_JSON }}" > "$GITHUB_WORKSPACE/credentials.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$GITHUB_WORKSPACE/credentials.json" >> $GITHUB_ENV
+          if [ -n "${{ secrets.SHEET_URL_OR_ID }}" ]; then echo "SHEET_URL_OR_ID=${{ secrets.SHEET_URL_OR_ID }}" >> $GITHUB_ENV; fi
+          if [ -n "${{ secrets.SHEET_TAB }}" ]; then echo "SHEET_TAB=${{ secrets.SHEET_TAB }}" >> $GITHUB_ENV; fi
+          if [ -n "${{ secrets.UPLOAD_SHEET_URL_OR_ID }}" ]; then echo "UPLOAD_SHEET_URL_OR_ID=${{ secrets.UPLOAD_SHEET_URL_OR_ID }}" >> $GITHUB_ENV; fi
+          if [ -n "${{ secrets.UPLOAD_SHEET_TAB }}" ]; then echo "UPLOAD_SHEET_TAB=${{ secrets.UPLOAD_SHEET_TAB }}" >> $GITHUB_ENV; fi
+      - name: Run Google Sheets integration tests (read + write)
+        run: pytest -q tests/integration/test_gsheets_read.py tests/integration/test_gsheets_write.py
+
+  # Optional network test for RandomUser; opt-in via repo variable RUN_RANDOMUSER_INTEGRATION='1'.
+  integration-randomuser:
+    if: ${{ vars.RUN_RANDOMUSER_INTEGRATION == '1' }}
+    needs: unit
+    runs-on: ubuntu-latest
+    env:
+      RUN_RANDOMUSER_INTEGRATION: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install deps
+        run: pip install -r requirements.txt
+      - name: Run RandomUser integration test
+        run: pytest -q tests/integration/test_random_user_fetch.py
