@@ -3,7 +3,6 @@ name: CI
 on:
   push:
   pull_request:
-  workflow_dispatch:
 
 jobs:
   # Runs fast, deterministic unit tests (integration excluded via pytest.ini testpaths).
@@ -35,12 +34,8 @@ jobs:
 
   # Reads and writes Google Sheets when service-account JSON and sheet IDs are provided.
   integration-sheets:
-    if: ${{ secrets.GCP_SA_JSON != '' && (secrets.SHEET_URL_OR_ID != '' || secrets.UPLOAD_SHEET_URL_OR_ID != '') }}
     needs: unit
     runs-on: ubuntu-latest
-    env:
-      RUN_SHEETS_INTEGRATION: "1"
-      RUN_SHEETS_WRITE: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -48,15 +43,40 @@ jobs:
           python-version: '3.11'
       - name: Install deps
         run: pip install -r requirements.txt
-      - name: Materialize Google credentials + test env
+
+      # Decide at runtime whether to run Sheets tests (secrets are available at step scope).
+      - name: Gate Sheets integrations
+        id: gate
+        env:
+          SA_JSON: ${{ secrets.GCP_SA_JSON }}
+          SRC: ${{ secrets.SHEET_URL_OR_ID }}
+          DST: ${{ secrets.UPLOAD_SHEET_URL_OR_ID }}
         run: |
-          echo "${{ secrets.GCP_SA_JSON }}" > "$GITHUB_WORKSPACE/credentials.json"
+          if [ -z "$SA_JSON" ] || { [ -z "$SRC" ] && [ -z "$DST" ]; }; then
+            echo "run=false" >> $GITHUB_OUTPUT
+            echo "No Sheets secrets/IDs provided — skipping Sheets integrations."
+          else
+            echo "run=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Materialize Google credentials + test env
+        if: steps.gate.outputs.run == 'true'
+        env:
+          SA_JSON: ${{ secrets.GCP_SA_JSON }}
+          SRC: ${{ secrets.SHEET_URL_OR_ID }}
+          DST: ${{ secrets.UPLOAD_SHEET_URL_OR_ID }}
+          SRC_TAB: ${{ secrets.SHEET_TAB }}
+          DST_TAB: ${{ secrets.UPLOAD_SHEET_TAB }}
+        run: |
+          echo "$SA_JSON" > "$GITHUB_WORKSPACE/credentials.json"
           echo "GOOGLE_APPLICATION_CREDENTIALS=$GITHUB_WORKSPACE/credentials.json" >> $GITHUB_ENV
-          if [ -n "${{ secrets.SHEET_URL_OR_ID }}" ]; then echo "SHEET_URL_OR_ID=${{ secrets.SHEET_URL_OR_ID }}" >> $GITHUB_ENV; fi
-          if [ -n "${{ secrets.SHEET_TAB }}" ]; then echo "SHEET_TAB=${{ secrets.SHEET_TAB }}" >> $GITHUB_ENV; fi
-          if [ -n "${{ secrets.UPLOAD_SHEET_URL_OR_ID }}" ]; then echo "UPLOAD_SHEET_URL_OR_ID=${{ secrets.UPLOAD_SHEET_URL_OR_ID }}" >> $GITHUB_ENV; fi
-          if [ -n "${{ secrets.UPLOAD_SHEET_TAB }}" ]; then echo "UPLOAD_SHEET_TAB=${{ secrets.UPLOAD_SHEET_TAB }}" >> $GITHUB_ENV; fi
+          [ -n "$SRC" ] && echo "SHEET_URL_OR_ID=$SRC" >> $GITHUB_ENV
+          [ -n "$SRC_TAB" ] && echo "SHEET_TAB=$SRC_TAB" >> $GITHUB_ENV
+          [ -n "$DST" ] && echo "UPLOAD_SHEET_URL_OR_ID=$DST" >> $GITHUB_ENV
+          [ -n "$DST_TAB" ] && echo "UPLOAD_SHEET_TAB=$DST_TAB" >> $GITHUB_ENV
+
       - name: Run Google Sheets integration tests (read + write)
+        if: steps.gate.outputs.run == 'true'
         run: pytest -q tests/integration/test_gsheets_read.py tests/integration/test_gsheets_write.py
 
   # Optional network test for RandomUser; opt-in via repo variable RUN_RANDOMUSER_INTEGRATION='1'.
