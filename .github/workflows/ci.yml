@@ -84,6 +84,9 @@ jobs:
 
       - name: Run Google Sheets integration tests (read + write)
         if: steps.gate.outputs.run == 'true'
+        env:
+          RUN_SHEETS_INTEGRATION: "1"
+          RUN_SHEETS_WRITE: "1"
         run: pytest -q tests/integration/test_gsheets_read.py tests/integration/test_gsheets_write.py
 
   # Optional network test for RandomUser; opt-in via repo variable RUN_RANDOMUSER_INTEGRATION='1'.
